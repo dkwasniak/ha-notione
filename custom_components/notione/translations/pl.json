@@ -1,0 +1,31 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "notiOne",
+        "description": "Podaj dane logowania do konta notiOne.",
+        "data": {
+          "email": "Email",
+          "password": "Hasło"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Nieprawidłowy email lub hasło.",
+      "cannot_connect": "Nie udało się połączyć z notiOne."
+    },
+    "abort": {
+      "already_configured": "To konto jest już skonfigurowane."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Opcje notiOne",
+        "data": {
+          "scan_interval": "Interwał odpytywania (sekundy)"
+        }
+      }
+    }
+  }
+}

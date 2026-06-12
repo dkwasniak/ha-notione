@@ -1,0 +1,11 @@
+{
+  "domain": "notione",
+  "name": "notiOne",
+  "codeowners": [],
+  "config_flow": true,
+  "documentation": "https://github.com/n4ts/ha-notione",
+  "integration_type": "hub",
+  "iot_class": "cloud_polling",
+  "requirements": [],
+  "version": "0.1.0"
+}
