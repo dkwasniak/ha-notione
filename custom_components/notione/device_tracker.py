@@ -12,7 +12,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import NotiOneConfigEntry
 from .const import DOMAIN
-from .coordinator import NotiOneCoordinator
+from .coordinator import NotiOneCoordinator, device_is_moving
 
 
 def _has_position(device: dict) -> bool:
@@ -90,6 +90,7 @@ class NotiOneTracker(CoordinatorEntity[NotiOneCoordinator], TrackerEntity):
         pos = self._position
         attrs: dict = {
             "speed": pos.get("speed"),
+            "moving": device_is_moving(self._device),
             "geocode_city": pos.get("geocodeCity"),
             "geocode_place": pos.get("geocodePlace"),
             "temperature": pos.get("temperature"),

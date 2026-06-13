@@ -22,8 +22,10 @@
     "step": {
       "init": {
         "title": "Opcje notiOne",
+        "description": "Wolne odpytywanie na postoju, szybkie gdy urządzenie zgłasza ruch.",
         "data": {
-          "scan_interval": "Interwał odpytywania (sekundy)"
+          "idle_interval": "Interwał na postoju (sekundy)",
+          "moving_interval": "Interwał w ruchu (sekundy)"
         }
       }
     }

@@ -20,8 +20,11 @@ SCOPE = "NOTI"
 
 CONF_EMAIL = "email"
 CONF_PASSWORD = "password"
-CONF_SCAN_INTERVAL = "scan_interval"
+CONF_IDLE_INTERVAL = "idle_interval"
+CONF_MOVING_INTERVAL = "moving_interval"
 
-DEFAULT_SCAN_INTERVAL = 30  # seconds
-MIN_SCAN_INTERVAL = 10
-MAX_SCAN_INTERVAL = 3600
+# Poll slowly while the device is parked, fast while it reports motion.
+DEFAULT_IDLE_INTERVAL = 30  # seconds, used when no device is moving
+DEFAULT_MOVING_INTERVAL = 10  # seconds, used while a device reports motion
+MIN_INTERVAL = 5
+MAX_INTERVAL = 3600

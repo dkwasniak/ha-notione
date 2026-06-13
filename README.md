@@ -38,9 +38,15 @@ A `device_tracker.<device_name>` entity appears per GPS device (e.g.
 
 ## Options
 
-After adding, click **Configure** on the integration to change the polling
-interval (default 30 s, range 10–3600 s). The device itself reports roughly every
-10 s.
+Polling adapts to motion: it runs at the **idle** interval while the device is
+parked and switches to the faster **moving** interval as soon as the device
+reports motion (notiOne's accelerometer status, with GPS speed as fallback).
+
+Click **Configure** on the integration to set both:
+- **Idle polling interval** — default 30 s (the bike reports ~every 60 s parked).
+- **Moving polling interval** — default 10 s (the bike reports ~every 10 s moving).
+
+Each tracker also exposes a `moving` attribute you can use in automations.
 
 ## How it works
 

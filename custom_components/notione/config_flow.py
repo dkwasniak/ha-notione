@@ -17,12 +17,14 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from .api import NotiOneApi, NotiOneApiError, NotiOneAuthError
 from .const import (
     CONF_EMAIL,
+    CONF_IDLE_INTERVAL,
+    CONF_MOVING_INTERVAL,
     CONF_PASSWORD,
-    CONF_SCAN_INTERVAL,
-    DEFAULT_SCAN_INTERVAL,
+    DEFAULT_IDLE_INTERVAL,
+    DEFAULT_MOVING_INTERVAL,
     DOMAIN,
-    MAX_SCAN_INTERVAL,
-    MIN_SCAN_INTERVAL,
+    MAX_INTERVAL,
+    MIN_INTERVAL,
 )
 
 STEP_USER_SCHEMA = vol.Schema(
@@ -69,7 +71,7 @@ class NotiOneConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class NotiOneOptionsFlow(OptionsFlow):
-    """Allow tuning the polling interval."""
+    """Allow tuning the idle and moving polling intervals."""
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -77,15 +79,22 @@ class NotiOneOptionsFlow(OptionsFlow):
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
 
-        current = self.config_entry.options.get(
-            CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
+        options = self.config_entry.options
+        interval = vol.All(
+            vol.Coerce(int), vol.Range(min=MIN_INTERVAL, max=MAX_INTERVAL)
         )
         schema = vol.Schema(
             {
-                vol.Required(CONF_SCAN_INTERVAL, default=current): vol.All(
-                    vol.Coerce(int),
-                    vol.Range(min=MIN_SCAN_INTERVAL, max=MAX_SCAN_INTERVAL),
-                )
+                vol.Required(
+                    CONF_IDLE_INTERVAL,
+                    default=options.get(CONF_IDLE_INTERVAL, DEFAULT_IDLE_INTERVAL),
+                ): interval,
+                vol.Required(
+                    CONF_MOVING_INTERVAL,
+                    default=options.get(
+                        CONF_MOVING_INTERVAL, DEFAULT_MOVING_INTERVAL
+                    ),
+                ): interval,
             }
         )
         return self.async_show_form(step_id="init", data_schema=schema)

@@ -14,19 +14,40 @@ from .const import DOMAIN
 _LOGGER = logging.getLogger(__name__)
 
 
+def device_is_moving(device: dict) -> bool:
+    """Return True if the device currently reports motion.
+
+    Prefers the accelerometer status (notiOne reports "MOVE" when in motion);
+    falls back to a non-zero GPS speed when the accelerometer field is absent.
+    """
+    pos = device.get("lastPosition") or {}
+    accel = pos.get("accelerometerStatusEnum")
+    if accel is not None:
+        return accel == "MOVE"
+    speed = pos.get("speed")
+    return bool(speed and speed > 0)
+
+
 class NotiOneCoordinator(DataUpdateCoordinator[dict[int, dict]]):
-    """Polls the notiOne device list and exposes it keyed by deviceId."""
+    """Polls the notiOne device list, speeding up while a device is moving."""
 
     def __init__(
-        self, hass: HomeAssistant, api: NotiOneApi, scan_interval: int
+        self,
+        hass: HomeAssistant,
+        api: NotiOneApi,
+        idle_interval: int,
+        moving_interval: int,
     ) -> None:
         super().__init__(
             hass,
             _LOGGER,
             name=DOMAIN,
-            update_interval=timedelta(seconds=scan_interval),
+            update_interval=timedelta(seconds=idle_interval),
         )
         self.api = api
+        self._idle_interval = idle_interval
+        self._moving_interval = moving_interval
+        self.moving = False
 
     async def _async_update_data(self) -> dict[int, dict]:
         try:
@@ -37,4 +58,21 @@ class NotiOneCoordinator(DataUpdateCoordinator[dict[int, dict]]):
         except NotiOneApiError as err:
             raise UpdateFailed(str(err)) from err
 
-        return {dev["deviceId"]: dev for dev in devices if "deviceId" in dev}
+        data = {dev["deviceId"]: dev for dev in devices if "deviceId" in dev}
+
+        # Adapt the polling cadence to motion. DataUpdateCoordinator reads
+        # self.update_interval when scheduling the next refresh, so mutating it
+        # here takes effect from the next cycle on.
+        moving = any(device_is_moving(dev) for dev in data.values())
+        if moving != self.moving:
+            _LOGGER.debug(
+                "notiOne motion %s -> polling every %ss",
+                "started" if moving else "stopped",
+                self._moving_interval if moving else self._idle_interval,
+            )
+        self.moving = moving
+        self.update_interval = timedelta(
+            seconds=self._moving_interval if moving else self._idle_interval
+        )
+
+        return data

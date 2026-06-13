@@ -10,9 +10,11 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from .api import NotiOneApi
 from .const import (
     CONF_EMAIL,
+    CONF_IDLE_INTERVAL,
+    CONF_MOVING_INTERVAL,
     CONF_PASSWORD,
-    CONF_SCAN_INTERVAL,
-    DEFAULT_SCAN_INTERVAL,
+    DEFAULT_IDLE_INTERVAL,
+    DEFAULT_MOVING_INTERVAL,
     DOMAIN,
 )
 from .coordinator import NotiOneCoordinator
@@ -30,8 +32,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: NotiOneConfigEntry) -> b
         entry.data[CONF_EMAIL],
         entry.data[CONF_PASSWORD],
     )
-    scan_interval = entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
-    coordinator = NotiOneCoordinator(hass, api, scan_interval)
+    idle_interval = entry.options.get(CONF_IDLE_INTERVAL, DEFAULT_IDLE_INTERVAL)
+    moving_interval = entry.options.get(
+        CONF_MOVING_INTERVAL, DEFAULT_MOVING_INTERVAL
+    )
+    coordinator = NotiOneCoordinator(hass, api, idle_interval, moving_interval)
     await coordinator.async_config_entry_first_refresh()
 
     entry.runtime_data = coordinator
@@ -49,5 +54,5 @@ async def async_unload_entry(hass: HomeAssistant, entry: NotiOneConfigEntry) -> 
 async def _async_update_listener(
     hass: HomeAssistant, entry: NotiOneConfigEntry
 ) -> None:
-    """Reload the entry when options (e.g. scan interval) change."""
+    """Reload the entry when options (polling intervals) change."""
     await hass.config_entries.async_reload(entry.entry_id)

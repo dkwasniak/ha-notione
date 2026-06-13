@@ -22,8 +22,10 @@
     "step": {
       "init": {
         "title": "notiOne options",
+        "description": "Poll slowly while parked, fast while the device reports motion.",
         "data": {
-          "scan_interval": "Polling interval (seconds)"
+          "idle_interval": "Idle polling interval (seconds)",
+          "moving_interval": "Moving polling interval (seconds)"
         }
       }
     }
