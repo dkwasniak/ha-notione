@@ -22,9 +22,16 @@ CONF_EMAIL = "email"
 CONF_PASSWORD = "password"
 CONF_IDLE_INTERVAL = "idle_interval"
 CONF_MOVING_INTERVAL = "moving_interval"
+CONF_MOVING_TRIGGER = "moving_trigger_entity"
+CONF_MOVING_GRACE = "moving_grace"
 
 # Poll slowly while the device is parked, fast while it reports motion.
 DEFAULT_IDLE_INTERVAL = 30  # seconds, used when no device is moving
 DEFAULT_MOVING_INTERVAL = 10  # seconds, used while a device reports motion
 MIN_INTERVAL = 5
 MAX_INTERVAL = 3600
+
+# Keep fast polling this long after the connection-trigger entity goes off, to
+# bridge the device's LTE warm-up until the API starts reporting motion.
+DEFAULT_MOVING_GRACE = 300  # seconds (5 min); 0 disables the bridge
+MIN_GRACE = 0

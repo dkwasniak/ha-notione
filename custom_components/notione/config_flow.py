@@ -13,18 +13,23 @@ from homeassistant.config_entries import (
 )
 from homeassistant.const import CONF_NAME
 from homeassistant.core import callback
+from homeassistant.helpers import selector
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import NotiOneApi, NotiOneApiError, NotiOneAuthError
 from .const import (
     CONF_EMAIL,
     CONF_IDLE_INTERVAL,
+    CONF_MOVING_GRACE,
     CONF_MOVING_INTERVAL,
+    CONF_MOVING_TRIGGER,
     CONF_PASSWORD,
     DEFAULT_IDLE_INTERVAL,
+    DEFAULT_MOVING_GRACE,
     DEFAULT_MOVING_INTERVAL,
     DOMAIN,
     MAX_INTERVAL,
+    MIN_GRACE,
     MIN_INTERVAL,
 )
 
@@ -88,6 +93,11 @@ class NotiOneOptionsFlow(OptionsFlow):
         interval = vol.All(
             vol.Coerce(int), vol.Range(min=MIN_INTERVAL, max=MAX_INTERVAL)
         )
+        trigger_entity = selector.EntitySelector(
+            selector.EntitySelectorConfig(
+                domain=["binary_sensor", "input_boolean", "device_tracker", "switch"]
+            )
+        )
         schema = vol.Schema(
             {
                 vol.Optional(CONF_NAME, default=current_name): str,
@@ -101,6 +111,16 @@ class NotiOneOptionsFlow(OptionsFlow):
                         CONF_MOVING_INTERVAL, DEFAULT_MOVING_INTERVAL
                     ),
                 ): interval,
+                vol.Optional(
+                    CONF_MOVING_TRIGGER,
+                    description={
+                        "suggested_value": options.get(CONF_MOVING_TRIGGER)
+                    },
+                ): trigger_entity,
+                vol.Required(
+                    CONF_MOVING_GRACE,
+                    default=options.get(CONF_MOVING_GRACE, DEFAULT_MOVING_GRACE),
+                ): vol.All(vol.Coerce(int), vol.Range(min=MIN_GRACE, max=MAX_INTERVAL)),
             }
         )
         return self.async_show_form(step_id="init", data_schema=schema)

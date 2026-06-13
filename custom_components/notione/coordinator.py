@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from datetime import timedelta
 
 from homeassistant.core import HomeAssistant
@@ -50,6 +51,7 @@ class NotiOneCoordinator(DataUpdateCoordinator[dict[int, dict]]):
         api: NotiOneApi,
         idle_interval: int,
         moving_interval: int,
+        grace_seconds: int = 0,
     ) -> None:
         super().__init__(
             hass,
@@ -60,7 +62,28 @@ class NotiOneCoordinator(DataUpdateCoordinator[dict[int, dict]]):
         self.api = api
         self._idle_interval = idle_interval
         self._moving_interval = moving_interval
+        self._grace_seconds = grace_seconds
         self.moving = False
+        # External "bike connected" trigger and its post-disconnect bridge window.
+        self._connected = False
+        self._grace_until = 0.0
+
+    def set_connection(self, active: bool, request_refresh: bool = True) -> None:
+        """Feed the external connection-trigger state into the cadence logic.
+
+        On connect: force the fast interval and (optionally) fetch immediately.
+        On disconnect: open a grace window so polling stays fast while the
+        device's LTE modem wakes up, until API motion takes over.
+        """
+        if active == self._connected:
+            return
+        self._connected = active
+        if active:
+            self.update_interval = timedelta(seconds=self._moving_interval)
+            if request_refresh:
+                self.hass.async_create_task(self.async_request_refresh())
+        else:
+            self._grace_until = time.monotonic() + self._grace_seconds
 
     async def _async_update_data(self) -> dict[int, dict]:
         try:
@@ -73,19 +96,25 @@ class NotiOneCoordinator(DataUpdateCoordinator[dict[int, dict]]):
 
         data = {dev["deviceId"]: dev for dev in devices if "deviceId" in dev}
 
-        # Adapt the polling cadence to motion. DataUpdateCoordinator reads
-        # self.update_interval when scheduling the next refresh, so mutating it
-        # here takes effect from the next cycle on.
-        moving = any(device_is_moving(dev) for dev in data.values())
-        if moving != self.moving:
+        # Adapt the polling cadence. Fast when the API reports motion, while the
+        # connection trigger is on, or within the post-disconnect grace window.
+        # DataUpdateCoordinator reads self.update_interval when scheduling the
+        # next refresh, so mutating it here takes effect from the next cycle on.
+        api_moving = any(device_is_moving(dev) for dev in data.values())
+        bridge = time.monotonic() < self._grace_until
+        fast = api_moving or self._connected or bridge
+        if fast != self.moving:
             _LOGGER.debug(
-                "notiOne motion %s -> polling every %ss",
-                "started" if moving else "stopped",
-                self._moving_interval if moving else self._idle_interval,
+                "notiOne fast-poll %s -> every %ss (api_moving=%s connected=%s bridge=%s)",
+                "on" if fast else "off",
+                self._moving_interval if fast else self._idle_interval,
+                api_moving,
+                self._connected,
+                bridge,
             )
-        self.moving = moving
+        self.moving = fast
         self.update_interval = timedelta(
-            seconds=self._moving_interval if moving else self._idle_interval
+            seconds=self._moving_interval if fast else self._idle_interval
         )
 
         return data

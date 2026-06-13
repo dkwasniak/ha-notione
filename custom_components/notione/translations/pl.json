@@ -27,7 +27,9 @@
         "data": {
           "name": "Nazwa trackera (puste = nazwa z notiOne)",
           "idle_interval": "Interwał na postoju (sekundy)",
-          "moving_interval": "Interwał w ruchu (sekundy)"
+          "moving_interval": "Interwał w ruchu (sekundy)",
+          "moving_trigger_entity": "Encja połączenia wymuszająca szybkie odpytywanie (opcjonalnie)",
+          "moving_grace": "Utrzymaj szybkie odpytywanie po rozłączeniu (sekundy)"
         }
       }
     }

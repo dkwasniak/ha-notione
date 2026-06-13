@@ -70,6 +70,18 @@ Click **Configure** on the integration at any time to adjust:
 | Tracker name | notiOne name | Overrides the device name; the tracker and its sensors inherit it as their name prefix. Leave blank to keep the name from notiOne. |
 | Idle polling interval | 30 s | How often to poll while no device is moving. |
 | Moving polling interval | 10 s | How often to poll while a device reports motion. |
+| Connection entity | — | Optional `binary_sensor`/`input_boolean`/presence entity that is `on`/`home` when the device is connected (e.g. an ESPHome BLE presence sensor). Turning on forces the fast interval immediately and refreshes — no waiting for API motion. |
+| Keep fast polling after disconnect | 300 s | Grace window keeping the fast interval after the connection entity goes off, bridging the device's LTE warm-up until the API reports motion. `0` disables it. |
+
+### Fast-polling logic
+
+Fast polling is active when **API motion OR connection entity on OR within the
+grace window**. So when you power on the bike at home its BLE connection triggers
+fast polling instantly; when you ride out of BLE range the grace window keeps it
+fast until the device's LTE comes online and the API reports motion — a seamless
+handover. It returns to the idle interval once there's no motion, no connection,
+and the grace window has elapsed. The connection entity only affects the polling
+cadence — the **Moving** sensor stays pure API motion.
 
 ## How it works
 

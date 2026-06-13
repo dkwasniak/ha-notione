@@ -27,7 +27,9 @@
         "data": {
           "name": "Tracker name (blank = use notiOne name)",
           "idle_interval": "Idle polling interval (seconds)",
-          "moving_interval": "Moving polling interval (seconds)"
+          "moving_interval": "Moving polling interval (seconds)",
+          "moving_trigger_entity": "Connection entity that forces fast polling (optional)",
+          "moving_grace": "Keep fast polling after disconnect (seconds)"
         }
       }
     }

@@ -73,7 +73,10 @@ Standard modern HA integration: config flow + `DataUpdateCoordinator` + platform
   `async_config_entry_first_refresh`, stores the coordinator in
   `entry.runtime_data` (typed alias `NotiOneConfigEntry`), then forwards
   `PLATFORMS = [DEVICE_TRACKER, BINARY_SENSOR, SENSOR]`. An update listener
-  reloads the entry when options change.
+  reloads the entry when options change. If a connection-trigger entity is
+  configured, it subscribes via `async_track_state_change_event` and maps
+  `on`/`home` → `coordinator.set_connection(...)` (unsub registered with
+  `entry.async_on_unload`).
 - **`coordinator.py`** — polls `devicelist`, returns `{deviceId: device}`. Holds
   two shared helpers used across platforms:
   - `device_is_moving(device)` — `accelerometerStatusEnum == "MOVE"`, else
@@ -81,9 +84,17 @@ Standard modern HA integration: config flow + `DataUpdateCoordinator` + platform
   - `device_display_name(device, device_id, override)` — name resolution order:
     user override → API `name` → `notiOne <id>`.
   - **Adaptive polling:** after each refresh it sets `self.update_interval` to the
-    moving interval if any device is moving, else the idle interval. The
+    moving interval if fast-polling is active, else the idle interval. The
     coordinator reads `update_interval` when scheduling the next refresh, so this
-    takes effect from the next cycle.
+    takes effect from the next cycle. Fast-polling is active when
+    `api_moving OR self._connected OR bridge`, where `bridge` is
+    `time.monotonic() < self._grace_until`.
+  - **External connection trigger:** `set_connection(active)` feeds an optional
+    "bike connected" entity into the cadence. On connect it forces the moving
+    interval and requests an immediate refresh; on disconnect it opens a grace
+    window (`_grace_until = now + grace_seconds`) so polling stays fast through
+    the device's LTE warm-up until API motion takes over. The trigger entity and
+    grace window affect cadence only — never the Moving binary sensor.
 - **`device_tracker.py`** — one `NotiOneTracker` per device with a GPS position
   (`_has_position` filters out phones/beacons). Provides lat/lon, `battery_level`,
   `location_accuracy`. Defines `name_override(entry)` (options > data) reused by
