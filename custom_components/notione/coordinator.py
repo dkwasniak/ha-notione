@@ -14,6 +14,11 @@ from .const import DOMAIN
 _LOGGER = logging.getLogger(__name__)
 
 
+def device_display_name(device: dict, device_id: int, override: str | None) -> str:
+    """Resolve the device name: user override, else API name, else a fallback."""
+    return (override or "").strip() or device.get("name") or f"notiOne {device_id}"
+
+
 def device_is_moving(device: dict) -> bool:
     """Return True if the device currently reports motion.
 

@@ -11,6 +11,7 @@ from homeassistant.config_entries import (
     ConfigFlowResult,
     OptionsFlow,
 )
+from homeassistant.const import CONF_NAME
 from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
@@ -31,6 +32,7 @@ STEP_USER_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_EMAIL): str,
         vol.Required(CONF_PASSWORD): str,
+        vol.Optional(CONF_NAME, default=""): str,
     }
 )
 
@@ -80,11 +82,15 @@ class NotiOneOptionsFlow(OptionsFlow):
             return self.async_create_entry(title="", data=user_input)
 
         options = self.config_entry.options
+        current_name = options.get(
+            CONF_NAME, self.config_entry.data.get(CONF_NAME, "")
+        )
         interval = vol.All(
             vol.Coerce(int), vol.Range(min=MIN_INTERVAL, max=MAX_INTERVAL)
         )
         schema = vol.Schema(
             {
+                vol.Optional(CONF_NAME, default=current_name): str,
                 vol.Required(
                     CONF_IDLE_INTERVAL,
                     default=options.get(CONF_IDLE_INTERVAL, DEFAULT_IDLE_INTERVAL),

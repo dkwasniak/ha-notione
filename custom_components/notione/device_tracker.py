@@ -10,15 +10,22 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from homeassistant.const import CONF_NAME
+
 from . import NotiOneConfigEntry
 from .const import DOMAIN
-from .coordinator import NotiOneCoordinator, device_is_moving
+from .coordinator import NotiOneCoordinator, device_display_name, device_is_moving
 
 
 def _has_position(device: dict) -> bool:
     """True if the device exposes a usable GPS fix (skips phones/beacons)."""
     pos = device.get("lastPosition")
     return bool(pos and pos.get("latitude") is not None)
+
+
+def name_override(entry: NotiOneConfigEntry) -> str | None:
+    """User-supplied device name, options taking precedence over setup data."""
+    return entry.options.get(CONF_NAME) or entry.data.get(CONF_NAME)
 
 
 async def async_setup_entry(
@@ -28,8 +35,9 @@ async def async_setup_entry(
 ) -> None:
     """Create a tracker entity for each notiOne device that reports a position."""
     coordinator = entry.runtime_data
+    override = name_override(entry)
     async_add_entities(
-        NotiOneTracker(coordinator, device_id)
+        NotiOneTracker(coordinator, device_id, override)
         for device_id, device in coordinator.data.items()
         if _has_position(device)
     )
@@ -42,13 +50,18 @@ class NotiOneTracker(CoordinatorEntity[NotiOneCoordinator], TrackerEntity):
     _attr_name = None  # use the device name as the entity name
     _attr_icon = "mdi:bike"
 
-    def __init__(self, coordinator: NotiOneCoordinator, device_id: int) -> None:
+    def __init__(
+        self,
+        coordinator: NotiOneCoordinator,
+        device_id: int,
+        override: str | None = None,
+    ) -> None:
         super().__init__(coordinator)
         self._device_id = device_id
         self._attr_unique_id = f"notione_{device_id}"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, str(device_id))},
-            name=self._device.get("name") or f"notiOne {device_id}",
+            name=device_display_name(self._device, device_id, override),
             manufacturer="notiOne",
             model=self._device.get("deviceType"),
         )

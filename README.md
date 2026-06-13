@@ -42,7 +42,10 @@ Polling adapts to motion: it runs at the **idle** interval while the device is
 parked and switches to the faster **moving** interval as soon as the device
 reports motion (notiOne's accelerometer status, with GPS speed as fallback).
 
-Click **Configure** on the integration to set both:
+Click **Configure** on the integration to set:
+- **Tracker name** — optional. Overrides the notiOne device name; the device and
+  all its entities (tracker, Moving sensor) inherit it as their name prefix.
+  Leave blank to use the name from notiOne. Can also be set during setup.
 - **Idle polling interval** — default 30 s (the bike reports ~every 60 s parked).
 - **Moving polling interval** — default 10 s (the bike reports ~every 10 s moving).
 

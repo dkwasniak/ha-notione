@@ -6,7 +6,8 @@
         "description": "Enter your notiOne account credentials.",
         "data": {
           "email": "Email",
-          "password": "Password"
+          "password": "Password",
+          "name": "Tracker name (optional)"
         }
       }
     },
@@ -24,6 +25,7 @@
         "title": "notiOne options",
         "description": "Poll slowly while parked, fast while the device reports motion.",
         "data": {
+          "name": "Tracker name (blank = use notiOne name)",
           "idle_interval": "Idle polling interval (seconds)",
           "moving_interval": "Moving polling interval (seconds)"
         }

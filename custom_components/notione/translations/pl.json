@@ -6,7 +6,8 @@
         "description": "Podaj dane logowania do konta notiOne.",
         "data": {
           "email": "Email",
-          "password": "Hasło"
+          "password": "Hasło",
+          "name": "Nazwa trackera (opcjonalnie)"
         }
       }
     },
@@ -24,6 +25,7 @@
         "title": "Opcje notiOne",
         "description": "Wolne odpytywanie na postoju, szybkie gdy urządzenie zgłasza ruch.",
         "data": {
+          "name": "Nazwa trackera (puste = nazwa z notiOne)",
           "idle_interval": "Interwał na postoju (sekundy)",
           "moving_interval": "Interwał w ruchu (sekundy)"
         }
