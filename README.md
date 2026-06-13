@@ -1,69 +1,90 @@
-# notiOne — Home Assistant custom integration
+# notiOne for Home Assistant
 
-Reads live GPS position from [notiOne](https://notione.com/) locators (the same
-unofficial API the official web panel uses) and exposes each device as a
-`device_tracker` entity — so it shows up on the HA Map and supports location
-history via the recorder.
+A custom [Home Assistant](https://www.home-assistant.io/) integration for
+[notiOne](https://notione.com/) GPS locators. It logs in with your notiOne
+account and exposes each GPS device as a `device_tracker`, so it appears on the
+HA map with location history, plus a motion binary sensor.
 
-Scope: **live position only** (latitude/longitude + battery, speed, last-seen as
-attributes). No MQTT required — the integration creates the entity natively.
+notiOne has no official API — this integration uses the same private endpoints
+as the notiOne web panel. See the [disclaimer](#disclaimer).
 
-## Install via HACS (recommended)
+## Features
 
-This repository already has the layout HACS expects: `hacs.json` and
-`custom_components/notione/` at the root. Push it to its own GitHub repo, then in
-Home Assistant:
+- **Live location** — each GPS locator becomes a `device_tracker` entity
+  (latitude/longitude), shown on the HA map with history via the recorder.
+- **Motion sensor** — a `binary_sensor` (device class `moving`) per device.
+- **Adaptive polling** — polls slowly while parked and speeds up automatically
+  while the device reports motion.
+- **Rich attributes** — battery, speed, last-seen time, and reverse-geocoded
+  city/place from notiOne.
+- **UI configuration** — set up and configure entirely from the HA UI; no YAML.
 
-1. **HACS → ⋮ (top right) → Custom repositories**.
-2. Add the repo URL, category **Integration**, and confirm.
-3. Find **notiOne** in HACS, click **Download**.
+## Entities
+
+For each notiOne GPS device:
+
+| Entity | Type | Notes |
+| --- | --- | --- |
+| `device_tracker.<name>` | Device tracker | GPS position; attributes: `battery_level`, `speed`, `moving`, `last_seen`, `geocode_city`, `geocode_place`, `temperature`, `humidity`, `device_state` |
+| `binary_sensor.<name>_moving` | Binary sensor (`moving`) | `on` while the device reports motion |
+
+Phones and Bluetooth beacons in the account are ignored — only GPS locators are
+added.
+
+## Installation
+
+### HACS (recommended)
+
+1. In HACS, open **⋮ → Custom repositories**.
+2. Add `https://github.com/dkwasniak/ha-notione`, category **Integration**.
+3. Find **notiOne** in HACS and click **Download**.
 4. Restart Home Assistant.
-5. **Settings → Devices & Services → Add Integration → "notiOne"** → enter
-   email + password.
 
-HACS also handles updates: bump `version` in `manifest.json`, tag a release, and
-HACS will offer the update.
+### Manual
 
-## Install manually (HA OS)
-
-1. Copy `custom_components/notione/` into your HA config:
-   `/config/custom_components/notione/`
-   (use the Samba share, the File editor add-on, or `scp` via the SSH add-on).
+1. Copy `custom_components/notione/` into your Home Assistant config directory:
+   `/config/custom_components/notione/`.
 2. Restart Home Assistant.
-3. **Settings → Devices & Services → Add Integration → "notiOne"**.
-4. Enter your notiOne email and password.
 
-A `device_tracker.<device_name>` entity appears per GPS device (e.g.
-`device_tracker.zojowoz`). Add it to a Map card or assign it to a person.
+## Configuration
 
-## Options
+After installing, add the integration from the UI:
 
-Polling adapts to motion: it runs at the **idle** interval while the device is
-parked and switches to the faster **moving** interval as soon as the device
-reports motion (notiOne's accelerometer status, with GPS speed as fallback).
+**Settings → Devices & Services → Add Integration → notiOne**, then enter your
+notiOne **email** and **password**. Credentials are stored encrypted in the
+Home Assistant config entry.
 
-Click **Configure** on the integration to set:
-- **Tracker name** — optional. Overrides the notiOne device name; the device and
-  all its entities (tracker, Moving sensor) inherit it as their name prefix.
-  Leave blank to use the name from notiOne. Can also be set during setup.
-- **Idle polling interval** — default 30 s (the bike reports ~every 60 s parked).
-- **Moving polling interval** — default 10 s (the bike reports ~every 10 s moving).
+Click **Configure** on the integration at any time to adjust:
 
-Each device also gets a **Moving** binary sensor (device class `moving`) and the
-tracker exposes a `moving` attribute — either can drive automations.
+| Option | Default | Description |
+| --- | --- | --- |
+| Tracker name | notiOne name | Overrides the device name; the tracker and its sensors inherit it as their name prefix. Leave blank to keep the name from notiOne. |
+| Idle polling interval | 30 s | How often to poll while no device is moving. |
+| Moving polling interval | 10 s | How often to poll while a device reports motion. |
 
 ## How it works
 
-- `POST auth.notinote.me/public/user/authorize/login` → access token (1 h).
-- `GET api.notinote.me/secured/internal/devicelist` (Bearer) → positions.
-- The token is cached and refreshed by re-login on expiry or HTTP 401.
+- `POST auth.notinote.me/public/user/authorize/login` → access token (valid ~1 h).
+- `GET api.notinote.me/secured/internal/devicelist` (Bearer) → device positions.
+- The token is cached and refreshed by re-logging in on expiry or HTTP 401.
+- Motion is read from notiOne's accelerometer status, falling back to GPS speed.
 
-Credentials are stored encrypted in the HA config entry (never in YAML or logs).
+## Development
 
-## Test the API without HA (optional)
+Check the API responds for your account without Home Assistant:
 
 ```bash
 ./custom_components/notione/tools/test_login.sh you@example.com 'your-password'
 ```
 
-Prints whether login + device list succeed and shows each device's coordinates.
+It prints whether login and the device list succeed, with each device's
+coordinates.
+
+## Disclaimer
+
+This project is not affiliated with or endorsed by notiOne. It relies on a
+private API that may change or break at any time. Use at your own risk.
+
+## License
+
+[MIT](LICENSE)
