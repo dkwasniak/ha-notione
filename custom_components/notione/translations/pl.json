@@ -37,6 +37,16 @@
       "moving": {
         "name": "W ruchu"
       }
+    },
+    "sensor": {
+      "battery": { "name": "Bateria" },
+      "speed": { "name": "Prędkość" },
+      "temperature": { "name": "Temperatura" },
+      "humidity": { "name": "Wilgotność" },
+      "last_seen": { "name": "Ostatnio widziany" },
+      "geocode_city": { "name": "Miasto" },
+      "geocode_place": { "name": "Miejsce" },
+      "device_state": { "name": "Stan urządzenia" }
     }
   }
 }

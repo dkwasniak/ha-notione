@@ -37,6 +37,16 @@
       "moving": {
         "name": "Moving"
       }
+    },
+    "sensor": {
+      "battery": { "name": "Battery" },
+      "speed": { "name": "Speed" },
+      "temperature": { "name": "Temperature" },
+      "humidity": { "name": "Humidity" },
+      "last_seen": { "name": "Last seen" },
+      "geocode_city": { "name": "City" },
+      "geocode_place": { "name": "Place" },
+      "device_state": { "name": "Device state" }
     }
   }
 }

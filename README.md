@@ -13,10 +13,11 @@ as the notiOne web panel. See the [disclaimer](#disclaimer).
 - **Live location** — each GPS locator becomes a `device_tracker` entity
   (latitude/longitude), shown on the HA map with history via the recorder.
 - **Motion sensor** — a `binary_sensor` (device class `moving`) per device.
+- **Telemetry sensors** — battery, speed, temperature, humidity, last-seen time,
+  device state, and reverse-geocoded city/place as individual sensor entities
+  (with history and proper units).
 - **Adaptive polling** — polls slowly while parked and speeds up automatically
   while the device reports motion.
-- **Rich attributes** — battery, speed, last-seen time, and reverse-geocoded
-  city/place from notiOne.
 - **UI configuration** — set up and configure entirely from the HA UI; no YAML.
 
 ## Entities
@@ -25,8 +26,16 @@ For each notiOne GPS device:
 
 | Entity | Type | Notes |
 | --- | --- | --- |
-| `device_tracker.<name>` | Device tracker | GPS position; attributes: `battery_level`, `speed`, `moving`, `last_seen`, `geocode_city`, `geocode_place`, `temperature`, `humidity`, `device_state` |
+| `device_tracker.<name>` | Device tracker | GPS position (lat/lon), `battery_level`, accuracy |
 | `binary_sensor.<name>_moving` | Binary sensor (`moving`) | `on` while the device reports motion |
+| `sensor.<name>_battery` | Sensor (battery, %) | Locator battery level |
+| `sensor.<name>_speed` | Sensor (speed, km/h) | Current speed |
+| `sensor.<name>_temperature` | Sensor (temperature, °C) | Reported temperature |
+| `sensor.<name>_humidity` | Sensor (humidity, %) | Reported humidity |
+| `sensor.<name>_last_seen` | Sensor (timestamp) | Time of the last GPS fix |
+| `sensor.<name>_city` | Sensor (text) | Reverse-geocoded city |
+| `sensor.<name>_place` | Sensor (text) | Reverse-geocoded place/street |
+| `sensor.<name>_device_state` | Sensor (text) | e.g. `ONLINE` / `OFFLINE` |
 
 Phones and Bluetooth beacons in the account are ignored — only GPS locators are
 added.

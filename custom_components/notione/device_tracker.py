@@ -2,19 +2,16 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-
 from homeassistant.components.device_tracker import SourceType, TrackerEntity
+from homeassistant.const import CONF_NAME
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from homeassistant.const import CONF_NAME
-
 from . import NotiOneConfigEntry
 from .const import DOMAIN
-from .coordinator import NotiOneCoordinator, device_display_name, device_is_moving
+from .coordinator import NotiOneCoordinator, device_display_name
 
 
 def _has_position(device: dict) -> bool:
@@ -98,25 +95,6 @@ class NotiOneTracker(CoordinatorEntity[NotiOneCoordinator], TrackerEntity):
     def battery_level(self) -> int | None:
         gps = self._device.get("gpsDetails") or {}
         return gps.get("battery")
-
-    @property
-    def extra_state_attributes(self) -> dict:
-        pos = self._position
-        attrs: dict = {
-            "speed": pos.get("speed"),
-            "moving": device_is_moving(self._device),
-            "geocode_city": pos.get("geocodeCity"),
-            "geocode_place": pos.get("geocodePlace"),
-            "temperature": pos.get("temperature"),
-            "humidity": pos.get("humidity"),
-            "device_state": self._device.get("deviceState"),
-        }
-        gpstime = pos.get("gpstime")
-        if gpstime:
-            attrs["last_seen"] = datetime.fromtimestamp(
-                gpstime / 1000, tz=timezone.utc
-            ).isoformat()
-        return {k: v for k, v in attrs.items() if v is not None}
 
     @callback
     def _handle_coordinator_update(self) -> None:

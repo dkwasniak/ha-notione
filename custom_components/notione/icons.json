@@ -8,6 +8,12 @@
           "off": "mdi:bike"
         }
       }
+    },
+    "sensor": {
+      "last_seen": { "default": "mdi:clock-outline" },
+      "geocode_city": { "default": "mdi:city" },
+      "geocode_place": { "default": "mdi:map-marker" },
+      "device_state": { "default": "mdi:radar" }
     }
   }
 }
