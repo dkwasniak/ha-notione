@@ -1,0 +1,13 @@
+{
+  "entity": {
+    "binary_sensor": {
+      "moving": {
+        "default": "mdi:bike",
+        "state": {
+          "on": "mdi:bike-fast",
+          "off": "mdi:bike"
+        }
+      }
+    }
+  }
+}

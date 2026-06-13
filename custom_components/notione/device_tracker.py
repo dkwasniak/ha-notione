@@ -40,6 +40,7 @@ class NotiOneTracker(CoordinatorEntity[NotiOneCoordinator], TrackerEntity):
 
     _attr_has_entity_name = True
     _attr_name = None  # use the device name as the entity name
+    _attr_icon = "mdi:bike"
 
     def __init__(self, coordinator: NotiOneCoordinator, device_id: int) -> None:
         super().__init__(coordinator)
