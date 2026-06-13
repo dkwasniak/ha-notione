@@ -25,12 +25,19 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import NotiOneConfigEntry
 from .const import DOMAIN
-from .coordinator import NotiOneCoordinator, device_display_name
+from .coordinator import NotiOneCoordinator, device_display_name, device_is_offline
 from .device_tracker import _has_position, name_override
 
 
 def _position(device: dict) -> dict:
     return device.get("lastPosition") or {}
+
+
+def _speed(device: dict) -> float | None:
+    # An offline device is stationary; its lastPosition speed is stale.
+    if device_is_offline(device):
+        return 0
+    return _position(device).get("speed")
 
 
 def _last_seen(device: dict) -> datetime | None:
@@ -62,7 +69,7 @@ SENSORS: tuple[NotiOneSensorDescription, ...] = (
         device_class=SensorDeviceClass.SPEED,
         native_unit_of_measurement=UnitOfSpeed.KILOMETERS_PER_HOUR,
         state_class=SensorStateClass.MEASUREMENT,
-        value_fn=lambda d: _position(d).get("speed"),
+        value_fn=_speed,
     ),
     NotiOneSensorDescription(
         key="temperature",

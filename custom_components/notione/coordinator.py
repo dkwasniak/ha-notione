@@ -19,12 +19,20 @@ def device_display_name(device: dict, device_id: int, override: str | None) -> s
     return (override or "").strip() or device.get("name") or f"notiOne {device_id}"
 
 
+def device_is_offline(device: dict) -> bool:
+    """True when notiOne reports the device as offline (data is stale)."""
+    return device.get("deviceState") == "OFFLINE"
+
+
 def device_is_moving(device: dict) -> bool:
     """Return True if the device currently reports motion.
 
-    Prefers the accelerometer status (notiOne reports "MOVE" when in motion);
-    falls back to a non-zero GPS speed when the accelerometer field is absent.
+    An offline device is never moving — its lastPosition holds the last known
+    (stale) values. Otherwise prefer the accelerometer status (notiOne reports
+    "MOVE" when in motion) and fall back to a non-zero GPS speed.
     """
+    if device_is_offline(device):
+        return False
     pos = device.get("lastPosition") or {}
     accel = pos.get("accelerometerStatusEnum")
     if accel is not None:
