@@ -29,5 +29,12 @@
         }
       }
     }
+  },
+  "entity": {
+    "binary_sensor": {
+      "moving": {
+        "name": "W ruchu"
+      }
+    }
   }
 }

@@ -46,7 +46,8 @@ Click **Configure** on the integration to set both:
 - **Idle polling interval** — default 30 s (the bike reports ~every 60 s parked).
 - **Moving polling interval** — default 10 s (the bike reports ~every 10 s moving).
 
-Each tracker also exposes a `moving` attribute you can use in automations.
+Each device also gets a **Moving** binary sensor (device class `moving`) and the
+tracker exposes a `moving` attribute — either can drive automations.
 
 ## How it works
 
