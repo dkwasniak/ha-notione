@@ -33,5 +33,10 @@
         }
       }
     }
+  },
+  "entity": {
+    "sensor": {
+      "last_seen_history": { "name": "Ostatnio widziany (historia)" }
+    }
   }
 }

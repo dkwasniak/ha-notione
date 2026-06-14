@@ -46,6 +46,7 @@
       "temperature": { "name": "Temperature" },
       "humidity": { "name": "Humidity" },
       "last_seen": { "name": "Last seen" },
+      "last_seen_history": { "name": "Last seen (history)" },
       "geocode_city": { "name": "City" },
       "geocode_place": { "name": "Place" },
       "device_state": { "name": "Device state" }

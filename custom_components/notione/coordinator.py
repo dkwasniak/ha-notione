@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from datetime import timedelta
@@ -95,6 +96,17 @@ class NotiOneCoordinator(DataUpdateCoordinator[dict[int, dict]]):
             raise UpdateFailed(str(err)) from err
 
         data = {dev["deviceId"]: dev for dev in devices if "deviceId" in dev}
+
+        # Fetch latest history sample in parallel for comparison sensor.
+        positioned = [did for did, dev in data.items() if dev.get("lastPosition")]
+        if positioned:
+            results = await asyncio.gather(
+                *(self.api.async_get_latest_sample_gpstime(did) for did in positioned),
+                return_exceptions=True,
+            )
+            for device_id, result in zip(positioned, results):
+                if isinstance(result, int):
+                    data[device_id]["_history_gpstime"] = result
 
         # Adapt the polling cadence. Fast when the API reports motion, while the
         # connection trigger is on, or within the post-disconnect grace window.

@@ -9,6 +9,7 @@ AUTH_BASE = "https://auth.notinote.me"
 API_BASE = "https://api.notinote.me"
 LOGIN_URL = f"{AUTH_BASE}/public/user/authorize/login"
 DEVICELIST_URL = f"{API_BASE}/secured/internal/devicelist"
+DEVICESAMPLES_URL = f"{API_BASE}/secured/internal/devicesamples"
 
 # Static public OAuth client used by the official panel/app. Not a user secret —
 # it is the same value shipped in the web panel and the legacy n4ts/ha-notione.

@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import logging
 import time
+from datetime import datetime, timezone
 
 from aiohttp import ClientError, ClientResponseError, ClientSession
 
 from .const import (
     CLIENT_BASIC_AUTH,
     DEVICELIST_URL,
+    DEVICESAMPLES_URL,
     LOGIN_URL,
     SCOPE,
 )
@@ -117,3 +119,34 @@ class NotiOneApi:
         if devices is None:
             raise NotiOneApiError("Device list response missing deviceList")
         return devices
+
+    async def async_get_latest_sample_gpstime(self, device_id: int) -> int | None:
+        """Return the most recent gpstime (ms epoch) from today's history, or None on any error."""
+        await self._ensure_token()
+        now = datetime.now(timezone.utc)
+        midnight_ms = int(
+            datetime(now.year, now.month, now.day, tzinfo=timezone.utc).timestamp()
+            * 1000
+        )
+        url = (
+            f"{DEVICESAMPLES_URL}"
+            f"?date={midnight_ms}&deviceId={device_id}&version=TUBE"
+        )
+        headers = {"Authorization": f"Bearer {self._access_token}"}
+        try:
+            async with self._session.get(url, headers=headers) as resp:
+                if resp.status == 401:
+                    _LOGGER.debug("notiOne samples 401 for device %s", device_id)
+                    return None
+                resp.raise_for_status()
+                data = await resp.json()
+        except (ClientResponseError, ClientError, TimeoutError) as err:
+            _LOGGER.debug("notiOne samples fetch error for device %s: %s", device_id, err)
+            return None
+
+        latest: int | None = None
+        for track in data.get("trackList") or []:
+            end_time = track.get("endTime")
+            if isinstance(end_time, int) and (latest is None or end_time > latest):
+                latest = end_time
+        return latest
