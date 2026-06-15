@@ -2,15 +2,16 @@
 # Quick check that the notiOne API still accepts your credentials and returns
 # device positions — independent of Home Assistant.
 #
-# Usage: ./test_login.sh <email> <password>
+# Usage: ./test_login.sh <email>
 set -euo pipefail
 
 EMAIL="${1:-}"
-PASSWORD="${2:-}"
-if [[ -z "$EMAIL" || -z "$PASSWORD" ]]; then
-  echo "Usage: $0 <email> <password>" >&2
+if [[ -z "$EMAIL" ]]; then
+  echo "Usage: $0 <email>" >&2
   exit 1
 fi
+read -r -s -p "notiOne password: " PASSWORD
+printf '\n'
 
 CLIENT_BASIC='dGVzdC1vYXV0aC1jbGllbnQtaWQ6JDJ5JDEyJHZYT1V0RWVuVkZDTzFaZ3kyWWllUHVGM1dGL3NEZ05PM1luaFJqbDQ5TklEbEViR2VTZU91'
 

@@ -1,0 +1,128 @@
+"""Tests for pure coordinator logic."""
+
+from __future__ import annotations
+
+import unittest
+from importlib.util import module_from_spec, spec_from_file_location
+from pathlib import Path
+import sys
+
+_MODULE_PATH = Path(__file__).parents[1] / "custom_components" / "notione" / "logic.py"
+_SPEC = spec_from_file_location("notione_logic", _MODULE_PATH)
+assert _SPEC is not None and _SPEC.loader is not None
+_LOGIC = module_from_spec(_SPEC)
+sys.modules[_SPEC.name] = _LOGIC
+_SPEC.loader.exec_module(_LOGIC)
+build_device_config_payload = _LOGIC.build_device_config_payload
+coordinates_in_zone = _LOGIC.coordinates_in_zone
+evaluate_live_automation = _LOGIC.evaluate_live_automation
+
+
+class ZoneLogicTest(unittest.TestCase):
+    def test_inside_and_outside_radius(self) -> None:
+        self.assertTrue(coordinates_in_zone(51.1, 17.0, 51.1, 17.0, 500))
+        self.assertFalse(coordinates_in_zone(51.11, 17.0, 51.1, 17.0, 500))
+
+    def test_invalid_zone_disables_evaluation(self) -> None:
+        self.assertIsNone(coordinates_in_zone(None, 17.0, 51.1, 17.0, 500))
+        self.assertIsNone(coordinates_in_zone(51.1, 17.0, 51.1, 17.0, -1))
+
+
+class DeviceConfigLogicTest(unittest.TestCase):
+    def test_preserves_other_writable_fields(self) -> None:
+        current = {"enabled": False, "threshold": 10, "readOnly": "ignored"}
+        payload = build_device_config_payload(
+            current, "enabled", True, {"enabled", "threshold"}
+        )
+        self.assertEqual({"enabled": True, "threshold": 10}, payload)
+
+    def test_rejects_unsupported_field(self) -> None:
+        with self.assertRaises(ValueError):
+            build_device_config_payload({}, "readOnly", 1, {"enabled"})
+
+
+class AutomationLogicTest(unittest.TestCase):
+    def test_start_inside_on_home_assistant_restart(self) -> None:
+        decision = evaluate_live_automation(
+            live_on=False,
+            source=None,
+            offline=False,
+            garage_on=False,
+            inside=True,
+            armed=True,
+        )
+        self.assertEqual(("start", "zone", False), (
+            decision.action, decision.reason, decision.armed
+        ))
+
+    def test_zone_exit_stops_and_rearms(self) -> None:
+        decision = evaluate_live_automation(
+            live_on=True,
+            source="zone",
+            offline=False,
+            garage_on=False,
+            inside=False,
+            armed=False,
+        )
+        self.assertEqual(("stop", "left_zone", True), (
+            decision.action, decision.reason, decision.armed
+        ))
+
+    def test_manual_session_is_not_stopped_by_zone(self) -> None:
+        for inside in (False, None):
+            decision = evaluate_live_automation(
+                live_on=True,
+                source="manual",
+                offline=False,
+                garage_on=False,
+                inside=inside,
+                armed=False,
+            )
+            self.assertIsNone(decision.action)
+
+    def test_offline_and_garage_stop_every_source(self) -> None:
+        for source in ("manual", "zone"):
+            offline = evaluate_live_automation(
+                live_on=True,
+                source=source,
+                offline=True,
+                garage_on=False,
+                inside=True,
+                armed=False,
+            )
+            garage = evaluate_live_automation(
+                live_on=True,
+                source=source,
+                offline=False,
+                garage_on=True,
+                inside=True,
+                armed=False,
+            )
+            self.assertEqual("offline", offline.reason)
+            self.assertEqual("garage_connected", garage.reason)
+            self.assertFalse(offline.armed)
+            self.assertFalse(garage.armed)
+
+    def test_blocked_session_requires_exit_before_restart(self) -> None:
+        blocked = evaluate_live_automation(
+            live_on=False,
+            source="zone",
+            offline=False,
+            garage_on=False,
+            inside=True,
+            armed=False,
+        )
+        self.assertIsNone(blocked.action)
+        rearmed = evaluate_live_automation(
+            live_on=False,
+            source="zone",
+            offline=False,
+            garage_on=False,
+            inside=False,
+            armed=blocked.armed,
+        )
+        self.assertTrue(rearmed.armed)
+
+
+if __name__ == "__main__":
+    unittest.main()

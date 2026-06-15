@@ -2,18 +2,21 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import time
-from datetime import datetime, timezone
+from typing import Any
 
 from aiohttp import ClientError, ClientResponseError, ClientSession
 
 from .const import (
+    API_ACCEPT,
     CLIENT_BASIC_AUTH,
+    DEVICECONFIG_URL,
     DEVICELIST_URL,
-    DEVICESAMPLES_URL,
     LOGIN_URL,
     SCOPE,
+    USER_AGENT,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -43,6 +46,11 @@ class NotiOneApi:
         self._password = password
         self._access_token: str | None = None
         self._token_expiry: float = 0.0
+
+    @property
+    def session(self) -> ClientSession:
+        """Return the shared Home Assistant HTTP session."""
+        return self._session
 
     async def login(self) -> None:
         """Authenticate and cache an access token.
@@ -89,6 +97,15 @@ class NotiOneApi:
         ):
             await self.login()
 
+    async def async_auth_headers(self) -> dict[str, str]:
+        """Return current authentication headers for REST or WebSocket calls."""
+        await self._ensure_token()
+        return {
+            "Authorization": f"Bearer {self._access_token}",
+            "Accept": API_ACCEPT,
+            "User-Agent": USER_AGENT,
+        }
+
     async def async_get_devices(self) -> list[dict]:
         """Return the raw deviceList, refreshing auth on expiry or 401."""
         await self._ensure_token()
@@ -101,7 +118,7 @@ class NotiOneApi:
             return await self._fetch_devices()
 
     async def _fetch_devices(self) -> list[dict]:
-        headers = {"Authorization": f"Bearer {self._access_token}"}
+        headers = await self.async_auth_headers()
         try:
             async with self._session.get(DEVICELIST_URL, headers=headers) as resp:
                 if resp.status == 401:
@@ -120,33 +137,52 @@ class NotiOneApi:
             raise NotiOneApiError("Device list response missing deviceList")
         return devices
 
-    async def async_get_latest_sample_gpstime(self, device_id: int) -> int | None:
-        """Return the most recent gpstime (ms epoch) from today's history, or None on any error."""
-        await self._ensure_token()
-        now = datetime.now(timezone.utc)
-        midnight_ms = int(
-            datetime(now.year, now.month, now.day, tzinfo=timezone.utc).timestamp()
-            * 1000
-        )
-        url = (
-            f"{DEVICESAMPLES_URL}"
-            f"?date={midnight_ms}&deviceId={device_id}&version=TUBE"
-        )
-        headers = {"Authorization": f"Bearer {self._access_token}"}
-        try:
-            async with self._session.get(url, headers=headers) as resp:
-                if resp.status == 401:
-                    _LOGGER.debug("notiOne samples 401 for device %s", device_id)
-                    return None
-                resp.raise_for_status()
-                data = await resp.json()
-        except (ClientResponseError, ClientError, TimeoutError) as err:
-            _LOGGER.debug("notiOne samples fetch error for device %s: %s", device_id, err)
-            return None
+    async def async_get_device_config(self, device_id: int) -> dict[str, Any]:
+        """Read the full configuration model for a GPS device."""
+        return await self._request_device_config("GET", device_id)
 
-        latest: int | None = None
-        for track in data.get("trackList") or []:
-            end_time = track.get("endTime")
-            if isinstance(end_time, int) and (latest is None or end_time > latest):
-                latest = end_time
-        return latest
+    async def async_set_device_config(
+        self, device_id: int, config: dict[str, Any]
+    ) -> None:
+        """Write a full device configuration model."""
+        await self._request_device_config("POST", device_id, config)
+
+    async def _request_device_config(
+        self, method: str, device_id: int, payload: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        await self._ensure_token()
+        try:
+            return await self._fetch_device_config(method, device_id, payload)
+        except NotiOneAuthError:
+            await self.login()
+            return await self._fetch_device_config(method, device_id, payload)
+
+    async def _fetch_device_config(
+        self, method: str, device_id: int, payload: dict[str, Any] | None
+    ) -> dict[str, Any]:
+        headers = await self.async_auth_headers()
+        url = f"{DEVICECONFIG_URL}?deviceId={device_id}"
+        try:
+            async with self._session.request(
+                method, url, headers=headers, json=payload
+            ) as resp:
+                if resp.status == 401:
+                    raise NotiOneAuthError("Device config returned 401")
+                resp.raise_for_status()
+                body = await resp.text()
+                if not body:
+                    return {}
+                data = json.loads(body)
+        except NotiOneAuthError:
+            raise
+        except ClientResponseError as err:
+            raise NotiOneApiError(
+                f"Device config failed: HTTP {err.status}"
+            ) from err
+        except json.JSONDecodeError as err:
+            raise NotiOneApiError("Device config response is not valid JSON") from err
+        except (ClientError, TimeoutError) as err:
+            raise NotiOneApiError(f"Device config transport error: {err}") from err
+        if not isinstance(data, dict):
+            raise NotiOneApiError("Device config response is not an object")
+        return data

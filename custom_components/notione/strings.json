@@ -31,6 +31,14 @@
           "moving_trigger_entity": "Connection entity that forces fast polling (optional)",
           "moving_grace": "Keep fast polling after disconnect (seconds)"
         }
+      },
+      "device": {
+        "title": "LIVE automation for {device_name}",
+        "description": "Choose the Home Assistant zone that starts LIVE and the garage connection sensor that stops it.",
+        "data": {
+          "zone_entity": "LIVE start zone (optional)",
+          "garage_entity": "Garage connection sensor (optional)"
+        }
       }
     }
   },
@@ -40,16 +48,32 @@
         "name": "Moving"
       }
     },
+    "button": {
+      "refresh_config": { "name": "Refresh configuration" }
+    },
+    "number": {
+      "speed_alarm_threshold": { "name": "Speed alarm threshold" },
+      "battery_alarm_threshold": { "name": "Battery alarm threshold" }
+    },
+    "select": {
+      "move_interval": { "name": "Moving interval" },
+      "stationary_interval": { "name": "Stationary interval" },
+      "battery_alarm_interval": { "name": "Battery alarm interval" }
+    },
     "sensor": {
       "battery": { "name": "Battery" },
       "speed": { "name": "Speed" },
       "temperature": { "name": "Temperature" },
       "humidity": { "name": "Humidity" },
       "last_seen": { "name": "Last seen" },
-      "last_seen_history": { "name": "Last seen (history)" },
       "geocode_city": { "name": "City" },
       "geocode_place": { "name": "Place" },
       "device_state": { "name": "Device state" }
+    },
+    "switch": {
+      "live": { "name": "LIVE tracking" },
+      "speed_alarm": { "name": "Speed alarm" },
+      "battery_alarm": { "name": "Battery alarm" }
     }
   }
 }

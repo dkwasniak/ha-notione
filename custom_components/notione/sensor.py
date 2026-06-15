@@ -47,13 +47,6 @@ def _last_seen(device: dict) -> datetime | None:
     return datetime.fromtimestamp(gpstime / 1000, tz=timezone.utc)
 
 
-def _last_seen_history(device: dict) -> datetime | None:
-    gpstime = device.get("_history_gpstime")
-    if not gpstime:
-        return None
-    return datetime.fromtimestamp(gpstime / 1000, tz=timezone.utc)
-
-
 @dataclass(frozen=True, kw_only=True)
 class NotiOneSensorDescription(SensorEntityDescription):
     """Describes a notiOne sensor and how to read its value from a device."""
@@ -99,12 +92,6 @@ SENSORS: tuple[NotiOneSensorDescription, ...] = (
         translation_key="last_seen",
         device_class=SensorDeviceClass.TIMESTAMP,
         value_fn=_last_seen,
-    ),
-    NotiOneSensorDescription(
-        key="last_seen_history",
-        translation_key="last_seen_history",
-        device_class=SensorDeviceClass.TIMESTAMP,
-        value_fn=_last_seen_history,
     ),
     NotiOneSensorDescription(
         key="geocode_city",

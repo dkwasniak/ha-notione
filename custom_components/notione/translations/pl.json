@@ -31,12 +31,47 @@
           "moving_trigger_entity": "Encja połączenia wymuszająca szybkie odpytywanie (opcjonalnie)",
           "moving_grace": "Utrzymaj szybkie odpytywanie po rozłączeniu (sekundy)"
         }
+      },
+      "device": {
+        "title": "Automatyzacja LIVE dla {device_name}",
+        "description": "Wybierz strefę Home Assistant uruchamiającą LIVE oraz czujnik połączenia z garażem, który zatrzymuje sesję.",
+        "data": {
+          "zone_entity": "Strefa uruchamiająca LIVE (opcjonalnie)",
+          "garage_entity": "Czujnik połączenia z garażem (opcjonalnie)"
+        }
       }
     }
   },
   "entity": {
+    "binary_sensor": {
+      "moving": { "name": "W ruchu" }
+    },
+    "button": {
+      "refresh_config": { "name": "Odśwież konfigurację" }
+    },
+    "number": {
+      "speed_alarm_threshold": { "name": "Próg alarmu prędkości" },
+      "battery_alarm_threshold": { "name": "Próg alarmu baterii" }
+    },
+    "select": {
+      "move_interval": { "name": "Interwał w ruchu" },
+      "stationary_interval": { "name": "Interwał postoju" },
+      "battery_alarm_interval": { "name": "Interwał alarmu baterii" }
+    },
     "sensor": {
-      "last_seen_history": { "name": "Ostatnio widziany (historia)" }
+      "battery": { "name": "Bateria" },
+      "speed": { "name": "Prędkość" },
+      "temperature": { "name": "Temperatura" },
+      "humidity": { "name": "Wilgotność" },
+      "last_seen": { "name": "Ostatnio widziany" },
+      "geocode_city": { "name": "Miasto" },
+      "geocode_place": { "name": "Miejsce" },
+      "device_state": { "name": "Stan urządzenia" }
+    },
+    "switch": {
+      "live": { "name": "Śledzenie LIVE" },
+      "speed_alarm": { "name": "Alarm prędkości" },
+      "battery_alarm": { "name": "Alarm baterii" }
     }
   }
 }

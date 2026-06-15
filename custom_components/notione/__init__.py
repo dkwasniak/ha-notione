@@ -11,6 +11,7 @@ from homeassistant.helpers.event import async_track_state_change_event
 from .api import NotiOneApi
 from .const import (
     CONF_EMAIL,
+    CONF_DEVICE_AUTOMATIONS,
     CONF_IDLE_INTERVAL,
     CONF_MOVING_GRACE,
     CONF_MOVING_INTERVAL,
@@ -28,7 +29,11 @@ _CONNECTED_STATES = (STATE_ON, STATE_HOME)
 PLATFORMS: list[Platform] = [
     Platform.DEVICE_TRACKER,
     Platform.BINARY_SENSOR,
+    Platform.BUTTON,
+    Platform.NUMBER,
+    Platform.SELECT,
     Platform.SENSOR,
+    Platform.SWITCH,
 ]
 
 NotiOneConfigEntry = ConfigEntry[NotiOneCoordinator]
@@ -74,6 +79,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: NotiOneConfigEntry) -> b
         )
 
     await coordinator.async_config_entry_first_refresh()
+    await coordinator.async_load_device_configs()
+    coordinator.configure_automations(
+        entry.options.get(CONF_DEVICE_AUTOMATIONS, {})
+    )
 
     entry.runtime_data = coordinator
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
@@ -84,7 +93,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: NotiOneConfigEntry) -> b
 
 async def async_unload_entry(hass: HomeAssistant, entry: NotiOneConfigEntry) -> bool:
     """Unload a config entry."""
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if unloaded:
+        await entry.runtime_data.async_shutdown()
+    return unloaded
 
 
 async def _async_update_listener(

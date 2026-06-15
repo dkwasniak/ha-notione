@@ -2,8 +2,8 @@
 
 A custom [Home Assistant](https://www.home-assistant.io/) integration for
 [notiOne](https://notione.com/) GPS locators. It logs in with your notiOne
-account and exposes each GPS device as a `device_tracker`, so it appears on the
-HA map with location history, plus a motion binary sensor.
+account and exposes each GPS device in Home Assistant, including on-demand LIVE
+tracking, zone automation, telemetry, and supported device settings.
 
 notiOne has no official API — this integration uses the same private endpoints
 as the notiOne web panel. See the [disclaimer](#disclaimer).
@@ -12,12 +12,20 @@ as the notiOne web panel. See the [disclaimer](#disclaimer).
 
 - **Live location** — each GPS locator becomes a `device_tracker` entity
   (latitude/longitude), shown on the HA map with history via the recorder.
+- **LIVE tracking** — a manual switch opens the notiOne binary WebSocket and
+  updates position from incoming GPS samples while REST polling is paused.
+- **Zone automation** — optionally start LIVE when a device enters a selected
+  HA zone and stop it when it leaves.
+- **Garage/offline stop** — stop any LIVE session when the device becomes
+  offline or a selected garage `binary_sensor` turns on.
 - **Motion sensor** — a `binary_sensor` (device class `moving`) per device.
 - **Telemetry sensors** — battery, speed, temperature, humidity, last-seen time,
   device state, and reverse-geocoded city/place as individual sensor entities
   (with history and proper units).
 - **Adaptive polling** — polls slowly while parked and speeds up automatically
   while the device reports motion.
+- **Device settings** — movement and stationary intervals, speed alarm, and
+  battery-saving alarm controls.
 - **UI configuration** — set up and configure entirely from the HA UI; no YAML.
 
 ## Entities
@@ -27,6 +35,7 @@ For each notiOne GPS device:
 | Entity | Type | Notes |
 | --- | --- | --- |
 | `device_tracker.<name>` | Device tracker | GPS position (lat/lon), `battery_level`, accuracy |
+| `switch.<name>_live_tracking` | Switch | Manual LIVE session; attributes show source, status, limit, close code, and reason |
 | `binary_sensor.<name>_moving` | Binary sensor (`moving`) | `on` while the device reports motion |
 | `sensor.<name>_battery` | Sensor (battery, %) | Locator battery level |
 | `sensor.<name>_speed` | Sensor (speed, km/h) | Current speed |
@@ -36,6 +45,10 @@ For each notiOne GPS device:
 | `sensor.<name>_city` | Sensor (text) | Reverse-geocoded city |
 | `sensor.<name>_place` | Sensor (text) | Reverse-geocoded place/street |
 | `sensor.<name>_device_state` | Sensor (text) | e.g. `ONLINE` / `OFFLINE` |
+
+Each GPS device also gets configuration entities for moving/stationary
+intervals, speed and battery alarms, their thresholds, the battery alarm
+interval, and a button that refreshes configuration from notiOne.
 
 Phones and Bluetooth beacons in the account are ignored — only GPS locators are
 added.
@@ -73,6 +86,17 @@ Click **Configure** on the integration at any time to adjust:
 | Connection entity | — | Optional `binary_sensor`/`input_boolean`/presence entity that is `on`/`home` when the device is connected (e.g. an ESPHome BLE presence sensor). Turning on forces the fast interval immediately and refreshes — no waiting for API motion. |
 | Keep fast polling after disconnect | 300 s | Grace window keeping the fast interval after the connection entity goes off, bridging the device's LTE warm-up until the API reports motion. `0` disables it. |
 
+The options flow then asks separately for each GPS device:
+
+| Option | Description |
+| --- | --- |
+| LIVE start zone | Optional `zone.*`. Entering its configured radius starts one automatic LIVE session; leaving stops a zone-started session. |
+| Garage connection sensor | Optional `binary_sensor.*`. State `on` stops every LIVE session for that device. |
+
+After a manual stop, server limit/error, offline stop, or garage stop, automatic
+LIVE remains disarmed until the device leaves the zone and enters it again.
+Manual LIVE remains available independently of the zone configuration.
+
 ### Fast-polling logic
 
 Fast polling is active when **API motion OR connection entity on OR within the
@@ -87,15 +111,22 @@ cadence — the **Moving** sensor stays pure API motion.
 
 - `POST auth.notinote.me/public/user/authorize/login` → access token (valid ~1 h).
 - `GET api.notinote.me/secured/internal/devicelist` (Bearer) → device positions.
+- `wss://api.notinote.me:444/ws/secured/internal/live` → binary protobuf LIVE
+  configuration and GPS samples.
+- `GET/POST api.notinote.me/secured/internal/deviceconfig` → supported settings,
+  written as read/full-update/read under a per-device lock.
 - The token is cached and refreshed by re-logging in on expiry or HTTP 401.
 - Motion is read from notiOne's accelerometer status, falling back to GPS speed.
+
+LIVE increases locator power usage. The integration does not reconnect a closed
+or expired session automatically.
 
 ## Development
 
 Check the API responds for your account without Home Assistant:
 
 ```bash
-./custom_components/notione/tools/test_login.sh you@example.com 'your-password'
+./custom_components/notione/tools/test_login.sh you@example.com
 ```
 
 It prints whether login and the device list succeed, with each device's

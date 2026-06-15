@@ -1,3 +1,4 @@
 __pycache__/
 *.pyc
 .DS_Store
+custom_components/notione/tools/*.tsv

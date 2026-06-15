@@ -19,11 +19,14 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from .api import NotiOneApi, NotiOneApiError, NotiOneAuthError
 from .const import (
     CONF_EMAIL,
+    CONF_DEVICE_AUTOMATIONS,
+    CONF_GARAGE_ENTITY,
     CONF_IDLE_INTERVAL,
     CONF_MOVING_GRACE,
     CONF_MOVING_INTERVAL,
     CONF_MOVING_TRIGGER,
     CONF_PASSWORD,
+    CONF_ZONE_ENTITY,
     DEFAULT_IDLE_INTERVAL,
     DEFAULT_MOVING_GRACE,
     DEFAULT_MOVING_INTERVAL,
@@ -78,13 +81,30 @@ class NotiOneConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class NotiOneOptionsFlow(OptionsFlow):
-    """Allow tuning the idle and moving polling intervals."""
+    """Configure polling and per-device LIVE automation entities."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._new_options: dict[str, Any] = {}
+        self._devices: list[tuple[int, str]] = []
+        self._device_index = 0
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
+            self._new_options = dict(self.config_entry.options)
+            self._new_options.update(user_input)
+            coordinator = self.config_entry.runtime_data
+            self._devices = [
+                (device_id, device.get("name") or str(device_id))
+                for device_id, device in coordinator.data.items()
+                if (device.get("gpsDetails") or {}).get("imei") is not None
+            ]
+            self._device_index = 0
+            if self._devices:
+                return await self.async_step_device()
+            return self.async_create_entry(title="", data=self._new_options)
 
         options = self.config_entry.options
         current_name = options.get(
@@ -124,3 +144,49 @@ class NotiOneOptionsFlow(OptionsFlow):
             }
         )
         return self.async_show_form(step_id="init", data_schema=schema)
+
+    async def async_step_device(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Configure zone and garage entities for each GPS device."""
+        device_id, device_name = self._devices[self._device_index]
+        automations = dict(
+            self._new_options.get(CONF_DEVICE_AUTOMATIONS, {})
+        )
+        current = dict(automations.get(str(device_id), {}))
+        if user_input is not None:
+            automations[str(device_id)] = {
+                key: value
+                for key, value in user_input.items()
+                if value not in (None, "")
+            }
+            self._new_options[CONF_DEVICE_AUTOMATIONS] = automations
+            self._device_index += 1
+            if self._device_index >= len(self._devices):
+                return self.async_create_entry(title="", data=self._new_options)
+            return await self.async_step_device()
+
+        zone_selector = selector.EntitySelector(
+            selector.EntitySelectorConfig(domain="zone")
+        )
+        garage_selector = selector.EntitySelector(
+            selector.EntitySelectorConfig(domain="binary_sensor")
+        )
+        schema = vol.Schema(
+            {
+                vol.Optional(
+                    CONF_ZONE_ENTITY,
+                    description={"suggested_value": current.get(CONF_ZONE_ENTITY)},
+                ): zone_selector,
+                vol.Optional(
+                    CONF_GARAGE_ENTITY,
+                    description={"suggested_value": current.get(CONF_GARAGE_ENTITY)},
+                ): garage_selector,
+            }
+        )
+        return self.async_show_form(
+            step_id="device",
+            data_schema=schema,
+            description_placeholders={"device_name": device_name},
+            last_step=self._device_index == len(self._devices) - 1,
+        )
