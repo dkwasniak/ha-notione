@@ -183,6 +183,6 @@ class NotiOneApi:
             raise NotiOneApiError("Device config response is not valid JSON") from err
         except (ClientError, TimeoutError) as err:
             raise NotiOneApiError(f"Device config transport error: {err}") from err
-        if not isinstance(data, dict):
+        if method == "GET" and not isinstance(data, dict):
             raise NotiOneApiError("Device config response is not an object")
-        return data
+        return data if isinstance(data, dict) else {}

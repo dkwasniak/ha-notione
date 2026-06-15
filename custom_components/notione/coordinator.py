@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 import time
 from typing import Any
@@ -68,7 +68,7 @@ def device_is_offline(device: dict) -> bool:
 
 def device_is_moving(device: dict) -> bool:
     """Return whether a device currently reports motion."""
-    if device_is_offline(device):
+    if device.get("deviceState") != "ONLINE":
         return False
     pos = device.get("lastPosition") or {}
     accel = pos.get("accelerometerStatusEnum")
@@ -176,6 +176,19 @@ class NotiOneCoordinator(DataUpdateCoordinator[dict[int, dict]]):
             raise UpdateFailed(str(err)) from err
 
         data = {dev["deviceId"]: dev for dev in devices if "deviceId" in dev}
+        prev = self.data or {}
+        now = datetime.now(timezone.utc)
+        for device_id, device in data.items():
+            old = prev.get(device_id, {})
+            old_pos = old.get("lastPosition") or {}
+            new_pos = device.get("lastPosition") or {}
+            if "_last_position_updated" in old:
+                device["_last_position_updated"] = old["_last_position_updated"]
+            if (old_pos.get("latitude"), old_pos.get("longitude")) != (
+                new_pos.get("latitude"),
+                new_pos.get("longitude"),
+            ) and new_pos.get("latitude") is not None:
+                device["_last_position_updated"] = now
         api_moving = any(device_is_moving(dev) for dev in data.values())
         bridge = time.monotonic() < self._grace_until
         fast = api_moving or self._connected or bridge
@@ -364,10 +377,14 @@ class NotiOneCoordinator(DataUpdateCoordinator[dict[int, dict]]):
         data = dict(self.data)
         device = dict(data.get(device_id, {}))
         position = dict(device.get("lastPosition") or {})
+        old_coords = (position.get("latitude"), position.get("longitude"))
         position.update(sample)
         position.pop("imei", None)
+        new_coords = (position.get("latitude"), position.get("longitude"))
         device["lastPosition"] = position
         device["deviceState"] = "ONLINE"
+        if old_coords != new_coords and new_coords[0] is not None:
+            device["_last_position_updated"] = datetime.now(timezone.utc)
         data[device_id] = device
         self.async_set_updated_data(data)
 

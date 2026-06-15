@@ -68,7 +68,8 @@
       "last_seen": { "name": "Last seen" },
       "geocode_city": { "name": "City" },
       "geocode_place": { "name": "Place" },
-      "device_state": { "name": "Device state" }
+      "device_state": { "name": "Device state" },
+      "last_position_updated": { "name": "Position updated" }
     },
     "switch": {
       "live": { "name": "LIVE tracking" },

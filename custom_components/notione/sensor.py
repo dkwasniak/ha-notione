@@ -25,7 +25,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import NotiOneConfigEntry
 from .const import DOMAIN
-from .coordinator import NotiOneCoordinator, device_display_name, device_is_offline
+from .coordinator import NotiOneCoordinator, device_display_name
 from .device_tracker import _has_position, name_override
 
 
@@ -34,9 +34,9 @@ def _position(device: dict) -> dict:
 
 
 def _speed(device: dict) -> float | None:
-    # An offline device is stationary; its lastPosition speed is stale.
-    if device_is_offline(device):
-        return 0
+    # Only ONLINE data is fresh; NO_GPS and OFFLINE have stale lastPosition.
+    if device.get("deviceState") != "ONLINE":
+        return None
     return _position(device).get("speed")
 
 
@@ -107,6 +107,12 @@ SENSORS: tuple[NotiOneSensorDescription, ...] = (
         key="device_state",
         translation_key="device_state",
         value_fn=lambda d: d.get("deviceState"),
+    ),
+    NotiOneSensorDescription(
+        key="last_position_updated",
+        translation_key="last_position_updated",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        value_fn=lambda d: d.get("_last_position_updated"),
     ),
 )
 
