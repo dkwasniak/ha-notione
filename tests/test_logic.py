@@ -42,7 +42,21 @@ class DeviceConfigLogicTest(unittest.TestCase):
 
 
 class AutomationLogicTest(unittest.TestCase):
-    def test_start_inside_on_home_assistant_restart(self) -> None:
+    def test_no_start_when_already_inside_at_startup(self) -> None:
+        # armed=False at startup — device already in zone must exit first
+        decision = evaluate_live_automation(
+            live_on=False,
+            source=None,
+            offline=False,
+            garage_on=False,
+            inside=True,
+            armed=False,
+        )
+        self.assertIsNone(decision.action)
+        self.assertFalse(decision.armed)
+
+    def test_start_on_zone_entry_after_exit(self) -> None:
+        # armed=True after exit — entering zone now triggers LIVE
         decision = evaluate_live_automation(
             live_on=False,
             source=None,
@@ -54,6 +68,19 @@ class AutomationLogicTest(unittest.TestCase):
         self.assertEqual(("start", "zone", False), (
             decision.action, decision.reason, decision.armed
         ))
+
+    def test_outside_at_startup_arms_for_entry(self) -> None:
+        # armed=False at startup, device outside — first evaluation re-arms
+        decision = evaluate_live_automation(
+            live_on=False,
+            source=None,
+            offline=False,
+            garage_on=False,
+            inside=False,
+            armed=False,
+        )
+        self.assertIsNone(decision.action)
+        self.assertTrue(decision.armed)
 
     def test_zone_exit_stops_and_rearms(self) -> None:
         decision = evaluate_live_automation(

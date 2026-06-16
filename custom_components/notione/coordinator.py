@@ -66,11 +66,17 @@ def device_is_offline(device: dict) -> bool:
     return device.get("deviceState") == "OFFLINE"
 
 
+_STALE_GPS_MS = 300_000  # 5 minutes — beyond this, lastPosition speed is unreliable
+
+
 def device_is_moving(device: dict) -> bool:
     """Return whether a device currently reports motion."""
     if device.get("deviceState") != "ONLINE":
         return False
     pos = device.get("lastPosition") or {}
+    gpstime = pos.get("gpstime")
+    if not gpstime or (time.time() * 1000 - gpstime) > _STALE_GPS_MS:
+        return False
     accel = pos.get("accelerometerStatusEnum")
     if accel is not None:
         return accel == "MOVE"
@@ -250,7 +256,7 @@ class NotiOneCoordinator(DataUpdateCoordinator[dict[int, dict]]):
             if str(device_id).isdigit() and isinstance(config, dict)
         }
         for device_id in self.data:
-            self._zone_armed[device_id] = True
+            self._zone_armed[device_id] = False
         entities = {
             entity_id
             for config in self._automations.values()

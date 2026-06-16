@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import time
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -25,7 +26,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import NotiOneConfigEntry
 from .const import DOMAIN
-from .coordinator import NotiOneCoordinator, device_display_name
+from .coordinator import NotiOneCoordinator, _STALE_GPS_MS, device_display_name
 from .device_tracker import _has_position, name_override
 
 
@@ -33,11 +34,20 @@ def _position(device: dict) -> dict:
     return device.get("lastPosition") or {}
 
 
+def _fresh_position(device: dict) -> dict:
+    """Return lastPosition only when the GPS fix is recent (≤ _STALE_GPS_MS)."""
+    pos = _position(device)
+    gpstime = pos.get("gpstime")
+    if not gpstime or (time.time() * 1000 - gpstime) > _STALE_GPS_MS:
+        return {}
+    return pos
+
+
 def _speed(device: dict) -> float | None:
     # Only ONLINE data is fresh; NO_GPS and OFFLINE have stale lastPosition.
     if device.get("deviceState") != "ONLINE":
         return None
-    return _position(device).get("speed")
+    return _fresh_position(device).get("speed")
 
 
 def _last_seen(device: dict) -> datetime | None:
@@ -77,7 +87,7 @@ SENSORS: tuple[NotiOneSensorDescription, ...] = (
         device_class=SensorDeviceClass.TEMPERATURE,
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         state_class=SensorStateClass.MEASUREMENT,
-        value_fn=lambda d: _position(d).get("temperature"),
+        value_fn=lambda d: _fresh_position(d).get("temperature"),
     ),
     NotiOneSensorDescription(
         key="humidity",
@@ -85,7 +95,7 @@ SENSORS: tuple[NotiOneSensorDescription, ...] = (
         device_class=SensorDeviceClass.HUMIDITY,
         native_unit_of_measurement=PERCENTAGE,
         state_class=SensorStateClass.MEASUREMENT,
-        value_fn=lambda d: _position(d).get("humidity"),
+        value_fn=lambda d: _fresh_position(d).get("humidity"),
     ),
     NotiOneSensorDescription(
         key="last_seen",
