@@ -109,14 +109,10 @@ cadence — the **Moving** sensor stays pure API motion.
 
 ## How it works
 
-- `POST auth.notinote.me/public/user/authorize/login` → access token (valid ~1 h).
-- `GET api.notinote.me/secured/internal/devicelist` (Bearer) → device positions.
-- `wss://api.notinote.me:444/ws/secured/internal/live` → binary protobuf LIVE
-  configuration and GPS samples.
-- `GET/POST api.notinote.me/secured/internal/deviceconfig` → supported settings,
-  written as read/full-update/read under a per-device lock.
-- The token is cached and refreshed by re-logging in on expiry or HTTP 401.
-- Motion is read from notiOne's accelerometer status, falling back to GPS speed.
+The integration authenticates with your notiOne account, periodically fetches
+device positions and telemetry, and supports real-time position updates and
+device settings — all through the same backend as the notiOne web panel.
+The access token is cached and refreshed automatically.
 
 LIVE increases locator power usage. The integration does not reconnect a closed
 or expired session automatically.

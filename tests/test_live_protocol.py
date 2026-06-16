@@ -44,12 +44,10 @@ class LiveProtocolTest(unittest.TestCase):
         self.assertEqual(_bytes_field(2, body), build_enable_request(imei))
 
     def test_parse_config(self) -> None:
-        body = _field(1, 0, encode_varint(123)) + _field(
-            2, 0, encode_varint(1800)
-        )
+        body = _field(1, 0, encode_varint(123)) + _field(2, 0, encode_varint(30))
         payload = _field(1, 0, encode_varint(2)) + _bytes_field(2, body)
         self.assertEqual(
-            ("config", {"imei": 123, "max_session_time": 1800}),
+            ("config", {"imei": 123, "max_session_time": 30}),
             parse_server_message(payload),
         )
 
