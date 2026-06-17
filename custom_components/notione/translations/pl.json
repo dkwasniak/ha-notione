@@ -23,13 +23,10 @@
     "step": {
       "init": {
         "title": "Opcje notiOne",
-        "description": "Wolne odpytywanie na postoju, szybkie gdy urządzenie zgłasza ruch.",
+        "description": "Maksymalny interwał między odpytaniami REST gdy śledzenie LIVE jest nieaktywne. Integracja planuje każde odpytanie tuż po spodziewanym raporcie GPS z urządzenia.",
         "data": {
           "name": "Nazwa trackera (puste = nazwa z notiOne)",
-          "idle_interval": "Interwał na postoju (sekundy)",
-          "moving_interval": "Interwał w ruchu (sekundy)",
-          "moving_trigger_entity": "Encja połączenia wymuszająca szybkie odpytywanie (opcjonalnie)",
-          "moving_grace": "Utrzymaj szybkie odpytywanie po rozłączeniu (sekundy)"
+          "idle_interval": "Maksymalny interwał odpytywania (sekundy)"
         }
       },
       "device": {

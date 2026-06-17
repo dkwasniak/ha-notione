@@ -25,9 +25,6 @@ SCOPE = "NOTI"
 CONF_EMAIL = "email"
 CONF_PASSWORD = "password"
 CONF_IDLE_INTERVAL = "idle_interval"
-CONF_MOVING_INTERVAL = "moving_interval"
-CONF_MOVING_TRIGGER = "moving_trigger_entity"
-CONF_MOVING_GRACE = "moving_grace"
 CONF_DEVICE_AUTOMATIONS = "device_automations"
 CONF_ZONE_ENTITY = "zone_entity"
 CONF_GARAGE_ENTITY = "garage_entity"
@@ -38,13 +35,17 @@ STATIONARY_INTERVALS = {
     "24 h": 86400,
 }
 
-# Poll slowly while the device is parked, fast while it reports motion.
-DEFAULT_IDLE_INTERVAL = 30  # seconds, used when no device is moving
-DEFAULT_MOVING_INTERVAL = 10  # seconds, used while a device reports motion
+DEFAULT_IDLE_INTERVAL = 60  # seconds between REST polls when LIVE is not active
 MIN_INTERVAL = 5
 MAX_INTERVAL = 3600
 
-# Keep fast polling this long after the connection-trigger entity goes off, to
-# bridge the device's LTE warm-up until the API starts reporting motion.
-DEFAULT_MOVING_GRACE = 300  # seconds (5 min); 0 disables the bridge
-MIN_GRACE = 0
+# Seconds added to the device's last gpstime + reporting interval to account for
+# LTE upload latency and API indexing before fresh data is queryable.
+PROPAGATION_BUFFER_S = 10
+
+# WS close codes where a zone-triggered session should be re-armed for automatic
+# restart once the device is confirmed still inside the zone via REST.
+LIVE_RETRIABLE_CLOSE_CODES = {
+    4000,  # server_error — transient server fault
+    4002,  # idle_timeout — server ended idle session; worth restarting
+}

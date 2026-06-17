@@ -21,7 +21,10 @@ from .const import (
     CONF_GARAGE_ENTITY,
     CONF_ZONE_ENTITY,
     DOMAIN,
+    LIVE_RETRIABLE_CLOSE_CODES,
     LIVE_WS_URL,
+    MIN_INTERVAL,
+    PROPAGATION_BUFFER_S,
 )
 from .live_protocol import (
     build_enable_request,
@@ -112,6 +115,7 @@ class LiveState:
     reason: str | None = None
     task: asyncio.Task[None] | None = None
     websocket: ClientWebSocketResponse | None = None
+    retriable_error: bool = False
 
     @property
     def is_on(self) -> bool:
@@ -126,8 +130,6 @@ class NotiOneCoordinator(DataUpdateCoordinator[dict[int, dict]]):
         hass: HomeAssistant,
         api: NotiOneApi,
         idle_interval: int,
-        moving_interval: int,
-        grace_seconds: int = 0,
     ) -> None:
         super().__init__(
             hass,
@@ -137,11 +139,6 @@ class NotiOneCoordinator(DataUpdateCoordinator[dict[int, dict]]):
         )
         self.api = api
         self._idle_interval = idle_interval
-        self._moving_interval = moving_interval
-        self._grace_seconds = grace_seconds
-        self.moving = False
-        self._connected = False
-        self._grace_until = 0.0
         self.live_states: dict[int, LiveState] = {}
         self.device_configs: dict[int, dict[str, Any]] = {}
         self._config_locks: dict[int, asyncio.Lock] = {}
@@ -150,18 +147,6 @@ class NotiOneCoordinator(DataUpdateCoordinator[dict[int, dict]]):
         self._automation_unsub: list[Callable[[], None]] = []
         self._evaluation_lock = asyncio.Lock()
         self._shutting_down = False
-
-    def set_connection(self, active: bool, request_refresh: bool = True) -> None:
-        """Feed the legacy external connection state into polling cadence."""
-        if active == self._connected:
-            return
-        self._connected = active
-        if active:
-            self._set_poll_interval(self._moving_interval)
-            if request_refresh and not self.live_active:
-                self.hass.async_create_task(self.async_request_refresh())
-        else:
-            self._grace_until = time.monotonic() + self._grace_seconds
 
     @property
     def live_active(self) -> bool:
@@ -173,6 +158,7 @@ class NotiOneCoordinator(DataUpdateCoordinator[dict[int, dict]]):
 
     async def _async_update_data(self) -> dict[int, dict]:
         if self.live_active:
+            _LOGGER.debug("REST poll skipped — LIVE session active")
             return self.data
         try:
             devices = await self.api.async_get_devices()
@@ -182,6 +168,7 @@ class NotiOneCoordinator(DataUpdateCoordinator[dict[int, dict]]):
             raise UpdateFailed(str(err)) from err
 
         data = {dev["deviceId"]: dev for dev in devices if "deviceId" in dev}
+        _LOGGER.debug("REST poll fetched %d device(s)", len(data))
         prev = self.data or {}
         now = datetime.now(timezone.utc)
         for device_id, device in data.items():
@@ -195,14 +182,34 @@ class NotiOneCoordinator(DataUpdateCoordinator[dict[int, dict]]):
                 new_pos.get("longitude"),
             ) and new_pos.get("latitude") is not None:
                 device["_last_position_updated"] = now
-        api_moving = any(device_is_moving(dev) for dev in data.values())
-        bridge = time.monotonic() < self._grace_until
-        fast = api_moving or self._connected or bridge
-        self.moving = fast
-        self._set_poll_interval(
-            self._moving_interval if fast else self._idle_interval
-        )
+        self._set_poll_interval(self._compute_next_poll_delay(data))
         return data
+
+    def _compute_next_poll_delay(self, data: dict[int, dict]) -> int:
+        """Compute seconds until next REST poll aligned with device reporting cadence."""
+        now = time.time()
+        candidates = []
+        for device_id, device in data.items():
+            pos = device.get("lastPosition") or {}
+            gpstime_ms = pos.get("gpstime")
+            if not gpstime_ms:
+                continue
+            config = self.device_configs.get(device_id) or {}
+            if device_is_moving(device):
+                device_interval = config.get("movePositionInterval", self._idle_interval)
+            else:
+                device_interval = min(
+                    config.get("stationaryPositionInterval", self._idle_interval),
+                    self._idle_interval,
+                )
+            next_expected = gpstime_ms / 1000 + device_interval + PROPAGATION_BUFFER_S
+            candidates.append(next_expected - now)
+        if not candidates:
+            return self._idle_interval
+        best = min(candidates)
+        delay = max(MIN_INTERVAL, min(int(best), self._idle_interval))
+        _LOGGER.debug("Next REST poll in %d s (best candidate %.1f s)", delay, best)
+        return delay
 
     async def async_load_device_configs(self) -> None:
         """Fetch configuration for every GPS device without failing setup."""
@@ -308,6 +315,14 @@ class NotiOneCoordinator(DataUpdateCoordinator[dict[int, dict]]):
                     armed=self._zone_armed.get(device_id, True),
                 )
                 self._zone_armed[device_id] = decision.armed
+                if decision.action:
+                    _LOGGER.debug(
+                        "Zone automation device=%s action=%s reason=%s armed=%s",
+                        device_id,
+                        decision.action,
+                        decision.reason,
+                        decision.armed,
+                    )
                 if decision.action == "start":
                     await self.async_start_live(device_id, "zone")
                 elif decision.action == "stop" and decision.reason:
@@ -320,6 +335,7 @@ class NotiOneCoordinator(DataUpdateCoordinator[dict[int, dict]]):
         state = self.live_states.setdefault(device_id, LiveState())
         if self._shutting_down or state.is_on or not isinstance(imei, int):
             return
+        _LOGGER.info("Starting LIVE session for device %s (source=%s)", device_id, source)
         self._zone_armed[device_id] = False
         state.source = source
         state.connecting = True
@@ -327,6 +343,7 @@ class NotiOneCoordinator(DataUpdateCoordinator[dict[int, dict]]):
         state.max_session_time = None
         state.close_code = None
         state.reason = None
+        state.retriable_error = False
         self._set_poll_interval(None)
         state.task = self.hass.async_create_task(
             self._async_live_loop(device_id, imei)
@@ -351,6 +368,11 @@ class NotiOneCoordinator(DataUpdateCoordinator[dict[int, dict]]):
                             state.connecting = False
                             state.active = True
                             state.max_session_time = payload["max_session_time"]
+                            _LOGGER.info(
+                                "LIVE session active for device %s (max=%s s)",
+                                device_id,
+                                payload["max_session_time"],
+                            )
                             self.async_update_listeners()
                         elif kind == "sample":
                             self._apply_live_sample(device_id, payload)
@@ -360,12 +382,15 @@ class NotiOneCoordinator(DataUpdateCoordinator[dict[int, dict]]):
                         break
                 close_code = websocket.close_code
                 close_reason = reason_for_close_code(close_code)
+                if close_code in LIVE_RETRIABLE_CLOSE_CODES:
+                    state.retriable_error = True
         except asyncio.CancelledError:
             close_code = state.close_code or 3000
             close_reason = state.reason or "integration_unload"
         except (ClientError, TimeoutError, ValueError) as err:
             _LOGGER.warning("LIVE session failed for device %s: %s", device_id, err)
             close_reason = str(err)
+            state.retriable_error = True
         finally:
             state.websocket = None
             state.task = None
@@ -375,6 +400,19 @@ class NotiOneCoordinator(DataUpdateCoordinator[dict[int, dict]]):
             state.reason = (
                 state.reason or close_reason or reason_for_close_code(close_code)
             )
+            _LOGGER.info(
+                "LIVE session ended for device %s — code=%s reason=%s retriable=%s",
+                device_id,
+                state.close_code,
+                state.reason,
+                state.retriable_error,
+            )
+            if state.retriable_error and state.source == "zone":
+                _LOGGER.debug(
+                    "LIVE device %s re-arming zone for automatic restart",
+                    device_id,
+                )
+                self._zone_armed[device_id] = True
             self.async_update_listeners()
             if not self.live_active and not self._shutting_down:
                 self._restore_polling_and_refresh()
@@ -392,6 +430,13 @@ class NotiOneCoordinator(DataUpdateCoordinator[dict[int, dict]]):
         if old_coords != new_coords and new_coords[0] is not None:
             device["_last_position_updated"] = datetime.now(timezone.utc)
         data[device_id] = device
+        _LOGGER.debug(
+            "LIVE sample device=%s lat=%.5f lon=%.5f gpstime=%s",
+            device_id,
+            new_coords[0] or 0.0,
+            new_coords[1] or 0.0,
+            sample.get("gpstime"),
+        )
         self.async_set_updated_data(data)
 
     async def async_stop_live(self, device_id: int, reason: str = "manual") -> None:
@@ -399,6 +444,7 @@ class NotiOneCoordinator(DataUpdateCoordinator[dict[int, dict]]):
         state = self.live_states.setdefault(device_id, LiveState())
         if not state.is_on:
             return
+        _LOGGER.info("Stopping LIVE for device %s (reason=%s)", device_id, reason)
         if reason in ("manual", "offline", "garage_connected"):
             self._zone_armed[device_id] = False
         state.close_code = 3000
@@ -424,8 +470,7 @@ class NotiOneCoordinator(DataUpdateCoordinator[dict[int, dict]]):
                 self._restore_polling_and_refresh()
 
     def _restore_polling_and_refresh(self) -> None:
-        seconds = self._moving_interval if self.moving else self._idle_interval
-        self._set_poll_interval(seconds)
+        self._set_poll_interval(self._idle_interval)
         self.hass.async_create_task(self.async_request_refresh())
 
     async def async_shutdown(self) -> None:

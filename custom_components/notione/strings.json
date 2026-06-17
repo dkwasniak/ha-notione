@@ -23,13 +23,10 @@
     "step": {
       "init": {
         "title": "notiOne options",
-        "description": "Poll slowly while parked, fast while the device reports motion.",
+        "description": "Maximum interval between REST polls when LIVE tracking is not active. The integration schedules each poll to land shortly after the next expected GPS report from the device.",
         "data": {
           "name": "Tracker name (blank = use notiOne name)",
-          "idle_interval": "Idle polling interval (seconds)",
-          "moving_interval": "Moving polling interval (seconds)",
-          "moving_trigger_entity": "Connection entity that forces fast polling (optional)",
-          "moving_grace": "Keep fast polling after disconnect (seconds)"
+          "idle_interval": "Maximum polling interval (seconds)"
         }
       },
       "device": {
